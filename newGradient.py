@@ -7,39 +7,42 @@ from scipy.optimize import minimize
 
 import InitialiseSkyrmion
 import SkyrmionEnergy
-Lx, Ly,Lz = 51, 51, 33
+Lx, Ly,Lz = 51, 51, 51
 R = 20.0
-numtwists = 1.0
+numtwists = 3
 twist = numtwists
 dx,dy = 1,1
 numits = 50000
 
-tolerance = -1e-6
+tolerance = -0.01
 gamma = 1e-3
-a,b,c = 11,-2,0.0#b is negative.a
+a,b,c = 1,.09,0.0#b is negative.a
 
 if not os.path.exists('results'):
     os.makedirs('results')
-if not os.path.exists('results/a%fb%fc%ftwist%d' % (a,b,c,twist)):
-    os.makedirs('results/a%fb%fc%ftwist%d' % (a,b,c,twist))
-os.chdir('results/a%fb%fc%ftwist%d' % (a,b,c,twist))
+if not os.path.exists('results/a%fb%fc%ftwist%f' % (a,b,c,twist)):
+    os.makedirs('results/a%fb%fc%ftwist%f' % (a,b,c,twist))
+if not os.path.exists('results/a%fb%fc%ftwist%f/finaldirectorfield' % (a,b,c,twist)):
+    os.makedirs('results/a%fb%fc%ftwist%f/finaldirectorfield' % (a,b,c,twist))
+if not os.path.exists('results/a%fb%fc%ftwist%f/phi' % (a,b,c,twist)):
+    os.makedirs('results/a%fb%fc%ftwist%f/phi' % (a,b,c,twist))
+if not os.path.exists('results/a%fb%fc%ftwist%f/theta' % (a,b,c,twist)):
+    os.makedirs('results/a%fb%fc%ftwist%f/theta' % (a,b,c,twist))
+os.chdir('results/a%fb%fc%ftwist%f' % (a,b,c,twist))
 
 
 def derivativesphere(gamma,phi,theta):
     i=0
     Energy = []
-    #phi = np.loadtxt('phi.dat')
-    #theta = np.loadtxt('theta.dat')
+    #phi = np.loadtxt('phi.csv')
+    #theta = np.loadtxt('theta.csv')
     E = SkyrmionEnergy.sphere(a,b,c, phi,theta,Lx,Ly,Lz)
     #SkyrmionEnergy.sphere(a,b,c, phi,theta)
     n=0
     fileEN = open('Energyevolution.dat','w')
     fileEN.write("%f\n" % E)
 
-    file = open('finaldirectorfield.dat', 'w')
-
-    phi,theta = minimise(gamma,phi,theta,a,b,c,i,file)
-
+    phi,theta = minimise(gamma,phi,theta,a,b,c,i)
     for i in range(0,numits):
         print(i)
         Eprev = E
@@ -55,24 +58,27 @@ def derivativesphere(gamma,phi,theta):
 
             return(phi,theta)
         else:
-            phi,theta = minimise(gamma,phi,theta,a,b,c,i,file)
+            phi,theta = minimise(gamma,phi,theta,a,b,c,i)
             phiprev, thetaprev = phi,theta
-
     #Energy = np.asarray(Energy)
     fileEN.close()
+    file.close()
+
 #    np.savetxt('phifinal',phi)
 #    np.savetxt('thetafinal',theta)
     return(phi,theta)
-# file = open('finaldirectorfield.dat', 'w')
-# phifile = open('phi.dat', 'w')
-# thetafile = open('theta.dat', 'w')
+# file = open('finaldirectorfield.csv', 'w')
+# phifile = open('phi.csv', 'w')
+# thetafile = open('theta.csv', 'w')
 
-def minimise(gamma,phi,theta,a,b,c,i,file):
+def minimise(gamma,phi,theta,a,b,c,i):
     dphi = np.zeros((Lx,Ly,Lz))
     dtheta = np.zeros((Lx,Ly,Lz))
     #gamma = -1e-3
-    phifile = open('phi.dat', 'w')
-    thetafile = open('theta.dat', 'w')
+
+    centrex = int(Lx/2)
+    centrey = int(Ly/2)
+
     for z in range(0,Lz):
 
         if z == 0:
@@ -88,8 +94,8 @@ def minimise(gamma,phi,theta,a,b,c,i,file):
         for x in range(0,Lx):
 
             if x == 0:
-                    xl = Lx-1
-                    xr = 1
+                xl = Lx-1
+                xr = 1
             elif x == Lx-1:
                 xl = Lx-2
                 xr = 0
@@ -98,7 +104,8 @@ def minimise(gamma,phi,theta,a,b,c,i,file):
                 xr = x + 1
 
             for y in range(0,Ly):
-
+                ddx = abs(centrex - x)
+                ddy = abs(centrey - y)
                 if y == 0:
                     ya = y+1
                     yb = Ly-1
@@ -180,47 +187,72 @@ def minimise(gamma,phi,theta,a,b,c,i,file):
                     dphidysq = dphidysqp
 
                 #dphidysq = min(abs(dphidysq1),abs(dphidysqm),abs(dphidysqp))
+                if math.sqrt(ddx**2 + ddy**2) <= R:
+                    dphi[x,y,z] = gamma*(2*math.sin(theta[x,y,z])*(-2*a*(dphidx*dthetadx + dphidy*dthetady)*math.cos(theta[x,y,z]) + (b - 2*a*dphidz)*dthetadz*math.cos(theta[x,y,z]) - \
+                                    a*(dphidxsq + dphidysq + dphidzsq)*math.sin(theta[x,y,z]) + b*dthetadx*math.cos(phi[x,y,z])*math.sin(theta[x,y,z]) + \
+                                    b*dthetady*math.sin(theta[x,y,z])*math.sin(phi[x,y,z])))
 
-                dphi[x,y,z] = gamma*(2*math.sin(theta[x,y,z])*(-2*a*(dphidx*dthetadx + dphidy*dthetady)*math.cos(theta[x,y,z]) + (b - 2*a*dphidz)*dthetadz*math.cos(theta[x,y,z]) - \
-                                a*(dphidxsq + dphidysq + dphidzsq)*math.sin(theta[x,y,z]) + b*dthetadx*math.cos(phi[x,y,z])*math.sin(theta[x,y,z]) + \
-                                b*dthetady*math.sin(theta[x,y,z])*math.sin(phi[x,y,z])))
+                    dtheta[x,y,z] = gamma*((-2.0)*a*(dthetadxsq + dthetadysq + dthetadzsq)\
+                                    + a*(dphidx**2 + dphidy**2)*math.sin(2*theta[x,y,z])\
+                                    - b*dphidz*math.sin(2*theta[x,y,z]) + a*dphidz**2*math.sin(2*theta[x,y,z]) + 2*math.sin(theta[x,y,z])**2*(c*math.sin(2*theta[x,y,z])\
+                                    - b*(dphidx*math.cos(phi[x,y,z]) + dphidy*math.sin(phi[x,y,z]))))
+                else:
+                    dphi[x,y,z] = 0.0
 
-                dtheta[x,y,z] = gamma*((-2.0)*a*(dthetadxsq + dthetadysq + dthetadzsq)\
-                                + a*(dphidx**2 + dphidy**2)*math.sin(2*theta[x,y,z])\
-                                - b*dphidz*math.sin(2*theta[x,y,z]) + a*dphidz**2*math.sin(2*theta[x,y,z]) + 2*math.sin(theta[x,y,z])**2*(c*math.sin(2*theta[x,y,z])\
-                                - b*(dphidx*math.cos(phi[x,y,z]) + dphidy*math.sin(phi[x,y,z]))))
-
+                    dtheta[x,y,z] = 0.0
     phi -= dphi
     theta -= dtheta
-    # file = open('finaldirectorfield.dat', 'w')
-    # phifile = open('phi.dat', 'w')
-    # thetafile = open('theta.dat', 'w')
-    currdir = open('currentdirectorfield.dat', 'w')
+    # file = open('finaldirectorfield.csv', 'w')
+    # phifile = open('phi.csv', 'w')
+    # thetafile = open('theta.csv', 'w')
+    #currdir = open('currentdirectorfield.csv', 'w')
+    currdirdat = open('currentdirectorfield.dat', 'w')
 
+    #currdir.write('x,y,z,nx,ny,nz\n')
+    if i % 100 == 0:
+        file = open('finaldirectorfield/finaldirectorfield%d.csv' % i, 'w')
+        file.write('x,y,z,vx,vy,vz\n')
+        phifile = open('phi/phi%d.csv' % i, 'w')
+        thetafile = open('theta/theta%d.csv' % i, 'w')
+        phifile.write('x,y,z,phi\n')
+        thetafile.write('x,y,z,theta\n')
+
+        for z in range(0,Lz):
+            for x in range(0,Lx):
+                for y in range(0,Ly):
+                    i = math.sin(theta[x,y,z])*math.cos(phi[x,y,z])
+                    j = math.sin(theta[x,y,z])*math.sin(phi[x,y,z])
+                    k = math.cos(theta[x,y,z])
+                    file.write("%d,%d,%d,%f,%f,%f\n" % (x,y,z,i,j,k))
+                    phifile.write("%d,%d,%d,%f\n" % (x,y,z,phi[x,y,z]))
+                    thetafile.write("%d,%d,%d,%f\n" % (x,y,z,theta[x,y,z]))
+        file.close()
+        phifile.close()
+        thetafile.close()
+    #phifile.write('x,y,z,phi\n')
+    #thetafile.write('x,y,z,theta\n')
     for z in range(0,Lz):
         for x in range(0,Lx):
             for y in range(0,Ly):
                 i = math.sin(theta[x,y,z])*math.cos(phi[x,y,z])
                 j = math.sin(theta[x,y,z])*math.sin(phi[x,y,z])
                 k = math.cos(theta[x,y,z])
-                phifile.write("%f\n" % phi[x,y,z])
-                thetafile.write("%f\n" % theta[x,y,z])
-                currdir.write("%f  %f  %f\n" % (i,j,k))
-                file.write("%f  %f  %f\n" % (i,j,k))
-    currdir.close()
-    phifile.close()
-    thetafile.close()
+    #            currdir.write("%d,%d,%d,%f,%f,%f\n" % (x,y,z,i,j,k))
+                currdirdat.write("%f    %f  %f\n" % (i,j,k))
+    #currdir.close()
+    currdirdat.close()
+
     return(phi,theta)
 
-    # np.savetxt('dtheta.dat', dtheta)
-    # np.savetxt('dphi.dat', dphi)
-    # np.savetxt('theta.dat', theta)
-    # np.savetxt('phi.dat', phi)
+    # np.savetxt('dtheta.csv', dtheta)
+    # np.savetxt('dphi.csv', dphi)
+    # np.savetxt('theta.csv', theta)
+    # np.savetxt('phi.csv', phi)
 
 phi,theta = InitialiseSkyrmion.initialise(Lx,Ly,Lz,R,twist)
 
 phi,theta = derivativesphere(gamma,phi,theta)
-# file = open('finaldirectorfield.dat', 'w')
+# file = open('finaldirectorfield.csv', 'w')
 #
 # for x in range(0,Lx):
 #     for y in range(0,Ly):
